@@ -32,6 +32,8 @@ def patient_menu(patient):
     while True:
         try:
             clr()
+            print("HOSPITAL MANAGEMENT SYSTEM")
+            print()
             print("PATIENT MENU")
             menuprint(
                 "Book Appointment",
@@ -50,8 +52,17 @@ def patient_menu(patient):
                 spec = backend.get_specialties()[opt_s - 1]
 
                 docs = backend.get_doc_names_by_spec(spec)
+                docs_time_slots = [
+                    " ".join(
+                        [
+                            doc,
+                            f"{backend.get_doc_time_slot(doc)[0]}-{backend.get_doc_time_slot(doc)[1]}",
+                        ]
+                    )
+                    for doc in docs
+                ]
                 print("\nSelect doctor:")
-                menuprint(*docs)
+                menuprint(*docs_time_slots)
                 opt_o = int(input("Enter option: "))
                 doctor = docs[opt_o - 1]
 
@@ -82,8 +93,9 @@ def patient_menu(patient):
                         input("\n(Press ENTER to continue)")
             else:
                 print("Invalid option!")
-        except:
-            pass
+        except Exception as e:
+            print(str(e))
+            input("\n(Press ENTER to continue)")
 
 
 def doctor_menu(doctor):
@@ -95,6 +107,8 @@ def doctor_menu(doctor):
     while True:
         try:
             clr()
+            print("HOSPITAL MANAGEMENT SYSTEM")
+            print()
             print("DOCTOR MENU")
             menuprint(
                 "View Appointments", "Cancel Appointment", "Change Time Slot", "Back"
@@ -132,8 +146,9 @@ def doctor_menu(doctor):
                     input("\n(Press ENTER to continue)")
             else:
                 print("Invalid option!")
-        except:
-            pass
+        except Exception as e:
+            print(str(e))
+            input("\n(Press ENTER to continue)")
 
 
 def admin_menu():
@@ -141,6 +156,8 @@ def admin_menu():
     while True:
         try:
             clr()
+            print("HOSPITAL MANAGEMENT SYSTEM")
+            print()
             print("ADMIN MENU")
             menuprint(
                 "Add Doctor", "Remove Doctor", "Add Admin", "Remove Admin", "Back"
@@ -151,14 +168,15 @@ def admin_menu():
             elif opt == 1:
                 doc_name = input("Enter doctor name: ")
                 spec = input("Enter doctor specialty: ")
-                st = input("Enter start time: ")
-                et = input("Enter end time: ")
+                st = input("Enter start time in 24-hour format(HH:MM): ")
+                et = input("Enter end time in 24-hour format(HH:MM): ")
                 if is_backend_success(backend.add_doctor(doc_name, spec, st, et)):
                     print("Doctor added!")
                     input("\n(Press ENTER to continue)")
             elif opt == 2:
-                menuprint(*backend.get_doc_names())
-                doc_name = input("Enter doctor name: ")
+                docs = backend.get_doc_names()
+                menuprint(*docs)
+                doc_name = docs[int(input("Enter option: ")) - 1]
                 if is_backend_success(backend.remove_doc(doc_name)):
                     print("Doctor removed!")
                     input("\n(Press ENTER to continue)")
@@ -176,8 +194,9 @@ def admin_menu():
                 input("\n(Press ENTER to continue)")
             else:
                 print("Invalid option!")
-        except:
-            pass
+        except Exception as e:
+            print(str(e))
+            input("\n(Press ENTER to continue)")
 
 
 def main():
@@ -186,7 +205,6 @@ def main():
         try:
             clr()
             print("HOSPITAL MANAGEMENT SYSTEM")
-            print()
             print()
             print("MAIN MENU")
             print("1. Patient Login")
@@ -199,7 +217,7 @@ def main():
                 break
             elif opt == 1:
                 pname = input("Enter patient name: ")
-                ph_no = int(input("Enter patient phone no.: "))
+                ph_no = input("Enter patient phone no.: ")
 
                 if (
                     pname in backend.get_patient_names()
@@ -234,15 +252,15 @@ def main():
                 adm_id = input("Enter admin id: ")
                 pswd = input("Enter admin password: ")
                 if backend.is_admin(adm_id, pswd):
-                    admin_menu(adm_id)
+                    admin_menu()
                 else:
                     print("Invalid admin!")
                     input("\n(Press ENTER to continue)")
-
             else:
                 print("Invalid option!")
-        except:
-            pass
+        except Exception as e:
+            print(str(e))
+            input("\n(Press ENTER to continue)")
     backend.stop()
 
 

@@ -36,7 +36,9 @@ def in_time_slot(t, start_time, end_time):
     # hour comparison
     if t[0] >= start_time[0] and t[0] <= end_time[0]:
         # minute comprison
-        if t[1] >= start_time[1] and t[1] <= end_time[1]:
+        if (t[1] >= start_time[1] and t[1] <= end_time[1]) or (
+            t[0] > start_time[0] and t[0] < end_time[0]
+        ):
             return True
         else:
             return False
@@ -45,6 +47,7 @@ def in_time_slot(t, start_time, end_time):
 
 
 def start():
+    """Starts the backend and loads all the necessary file objects"""
     global appts_file
     global doctors_file
     global patients_file
@@ -53,13 +56,18 @@ def start():
     if not os.path.isdir(files_path):
         os.mkdir(files_path)
 
-    admin_file = open(files_path + "admin.csv", "a+")
-    appts_file = open(files_path + "appts.csv", "a+")
-    doctors_file = open(files_path + "docs.csv", "a+")
-    patients_file = open(files_path + "patients.csv", "a+")
+    admin_file = open(files_path + "admin.csv", "a+", newline="")
+    appts_file = open(files_path + "appts.csv", "a+", newline="")
+    doctors_file = open(files_path + "docs.csv", "a+", newline="")
+    patients_file = open(files_path + "patients.csv", "a+", newline="")
 
 
 def change_mode(mode):
+    """Changes the access mode of all the files
+
+    Args:
+        mode (str): _description_
+    """
     global appts_file
     global doctors_file
     global patients_file
@@ -68,30 +76,30 @@ def change_mode(mode):
     if appts_file is not None:
         if not appts_file.closed:
             appts_file.close()
-        appts_file = open(files_path + "appts.csv", mode)
+        appts_file = open(files_path + "appts.csv", mode, newline="")
     else:
-        appts_file = open(files_path + "appts.csv", mode)
+        appts_file = open(files_path + "appts.csv", mode, newline="")
 
     if doctors_file is not None:
         if not doctors_file.closed:
             doctors_file.close()
-        doctors_file = open(files_path + "docs.csv", mode)
+        doctors_file = open(files_path + "docs.csv", mode, newline="")
     else:
-        doctors_file = open(files_path + "docs.csv", mode)
+        doctors_file = open(files_path + "docs.csv", mode, newline="")
 
     if patients_file is not None:
         if not patients_file.closed:
             patients_file.close()
-        patients_file = open(files_path + "patients.csv", mode)
+        patients_file = open(files_path + "patients.csv", mode, newline="")
     else:
-        patients_file = open(files_path + "patients.csv", mode)
+        patients_file = open(files_path + "patients.csv", mode, newline="")
 
     if admin_file is not None:
         if not admin_file.closed:
             admin_file.close()
-        admin_file = open(files_path + "admin.csv", mode)
+        admin_file = open(files_path + "admin.csv", mode, newline="")
     else:
-        admin_file = open(files_path + "admin.csv", mode)
+        admin_file = open(files_path + "admin.csv", mode, newline="")
 
 
 def stop():
@@ -148,7 +156,7 @@ def get_doc_names_by_spec(spec):
     r = csv.reader(doctors_file)
     names = []
     for row in r:
-        if row[1] == spec:
+        if row[1].strip() == spec.strip():
             names.append(row[0])
     change_mode("a+")
     return names
@@ -167,13 +175,24 @@ def get_doc_time_slot(doc_name):
         change_mode("a+")
 
 
-def get_appts_by_doc(name):
+def not_in_appts_time_slot(doc_name, appt_time):
+    appts = get_appts_by_doc(doc_name)
+    for appt in appts:
+        if appt[4] != "Canceled":
+            if in_time_slot(appt_time, appt[3], appt[3][:-2] + "15"):
+                return False
+                break
+    else:
+        return True
+
+
+def get_appts_by_doc(doc_name):
     change_mode("r+")
     global appts_file
     r = csv.reader(appts_file)
     appts = []
     for row in r:
-        if row[2].strip() == name:
+        if row[2].strip() == doc_name.strip():
             appts.append(row)
     change_mode("a+")
     return appts
@@ -228,14 +247,19 @@ def add_appointment(patient_name, doctor_name, time_slot):
         if doctor_name in get_doc_names():
             timing = get_doc_time_slot(doctor_name)
             if in_time_slot(time_slot, timing[0], timing[1]):
-                w = csv.writer(appts_file)
-                w.writerow([appt_id, patient_name, doctor_name, time_slot, "Booked"])
+                if not_in_appts_time_slot(doctor_name, time_slot):
+                    w = csv.writer(appts_file)
+                    w.writerow(
+                        [appt_id, patient_name, doctor_name, time_slot, "Booked"]
+                    )
 
-                return "succ: appointment booked"
+                    return "succ: appointment booked"
+                else:
+                    return "err: error! conflict with another appointment"
             else:
-                return "err: error! patient not registered"
+                return "err: error! wrong time slot"
         else:
-            return "err: error! patient not registered"
+            return "err: error! doctor not registered"
     else:
         return "err: error! patient not registered"
 
@@ -280,11 +304,12 @@ def modify_appointment_status(appt_id, status):
         else:
             mod_appts.append(row)
 
-    appts_file.close()
-    appts_file = open(files_path + "appts.csv", "w")
-
+    if not appts_file.closed:
+        appts_file.close()
+    appts_file = open(files_path + "appts.csv", "w", newline="")
     w = csv.writer(appts_file)
     w.writerows(mod_appts)
+    appts_file.close()
 
     change_mode("a+")
 
@@ -295,22 +320,23 @@ def modify_doc_time_slot(doc_name, start_time, end_time):
     r = csv.reader(doctors_file)
     mod_recs = []
     for row in r:
-        if int(row[0]) == doc_name:
+        if row[0].strip() == doc_name.strip():
             rec = row.copy()
             rec[2] = start_time
             rec[3] = end_time
             mod_recs.append(rec)
         else:
             mod_recs.append(row)
+
     if not doctors_file.closed:
         doctors_file.close()
-
-    doctors_file = open(files_path + "docs.csv", "w")
-    doctors_file.seek(0, 0)
+    doctors_file = open(files_path + "docs.csv", "w", newline="")
     w = csv.writer(doctors_file)
     w.writerows(mod_recs)
+    doctors_file.close()
 
     change_mode("a+")
+
     return "succ"
 
 
@@ -320,14 +346,15 @@ def remove_doc(doc_name):
     r = csv.reader(doctors_file)
     mod_recs = []
     for row in r:
-        if row[0].strip() != doc_name:
+        if row[0].strip() != doc_name.strip():
             mod_recs.append(row)
 
-    doctors_file.close()
-    doctors_file = open(files_path + "docs.csv", "w")
-    doctors_file.seek(0, 0)
+    if not doctors_file.closed:
+        doctors_file.close()
+    doctors_file = open(files_path + "docs.csv", "w", newline="")
     w = csv.writer(doctors_file)
     w.writerows(mod_recs)
+    doctors_file.close()
 
     change_mode("a+")
 
@@ -365,8 +392,21 @@ def remove_admin(u_id, password):
     if not admin_file.closed:
         admin_file.close()
 
-    admin_file = open(files_path + "admin.csv", "w")
+    admin_file = open(files_path + "admin.csv", "w", newline="")
     w = csv.writer(admin_file)
     w.writerows(mod_recs)
+    admin_file.close()
+
     change_mode("a+")
     return "succ"
+
+
+if __name__ != "__main__" and not os.path.isfile(files_path + "admin.csv"):
+    add_admin("admin", "1234")
+    add_doctor("A. Kumar", "Cardiology", "10:00", "14:00")
+    add_doctor("C.K. Goyal", "Cardiology", "10:30", "13:00")
+    add_doctor("B. Pal", "Cardiology", "13:00", "17:00")
+    add_doctor("K.J. Jain", "Orthopaedic", "09:00", "14:30")
+    add_doctor("J. Shah", "Orthopaedic", "19:00", "21:30")
+    add_doctor("S. Agarwal", "ENT", "16:00", "18:00")
+    add_doctor("A. Pote", "Dermatology", "12:00", "16:00")
